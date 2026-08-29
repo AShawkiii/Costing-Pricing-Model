@@ -6,6 +6,7 @@
  * mark-up and would under-price the product.)
  */
 
+import { Link } from 'react-router-dom';
 import { Headline, SummaryRow } from '../ui/Summary';
 import { useApp } from '../../state/AppStateContext';
 import { useFormatters } from '../../hooks/useFormatters';
@@ -40,6 +41,9 @@ export function PricingSummaryCard() {
           <SummaryRow label="Total Revenue at this price" value={f.money(pricing.totalRevenue)} sub />
           <SummaryRow label="Total Gross Profit" value={f.money(pricing.totalGrossProfit)} sub />
           <SummaryRow label="Realised Gross Margin" value={f.pct(pricing.realisedGrossMargin)} total />
+          <Link className="btn btn--secondary btn--sm" to="/card" style={{ marginTop: 10, width: '100%', justifyContent: 'center' }}>
+            View Costing &amp; Pricing Card →
+          </Link>
         </div>
       </div>
     </div>

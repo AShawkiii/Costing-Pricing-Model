@@ -3,12 +3,13 @@
 A production-ready web app for a fashion / manufacturing business that calculates the **true cost per unit**
 of a product and the **selling price required to hit a target gross profit margin**.
 
-Two pages, one live model:
+Three pages, one live model:
 
 | Page | Purpose |
 | --- | --- |
-| **1 · Costing** | Direct Cost, Sample Cost, Marketing Expenses, Indirect Cost → **Total Cost Per Unit** |
+| **1 · Costing** | Product info & photo, Direct Cost, Sample Cost, Marketing Expenses, Indirect Cost → **Total Cost Per Unit** |
 | **2 · Pricing** | Target gross margin → **Recommended Selling Price**, mark-up, scenario table |
+| **3 · Card** | **Costing & Pricing Card** — one approval-ready page: photo, cost broken down per unit, selling price |
 
 Everything recalculates on every keystroke; nothing is hard-coded; every visible button works.
 
@@ -32,7 +33,9 @@ Everything recalculates on every keystroke; nothing is hard-coded; every visible
     │   ├── calculations.test.ts     Unit tests + the specification test case
     │   ├── validation.ts            Validation rules (pure)
     │   ├── format.ts                EGP / percentage / thousands formatting
-    │   ├── storage.ts               localStorage persistence (swappable for an API)
+    │   ├── image.ts                 Product photo: validation + downscaling
+    │   ├── print.ts                 Chooses which document the browser prints
+    │   ├── storage.ts               localStorage persistence + model migration
     │   └── id.ts                    Row id generator
     │
     ├── config/
@@ -47,9 +50,10 @@ Everything recalculates on every keystroke; nothing is hard-coded; every visible
     │
     ├── components/
     │   ├── ui/                      Card, Field, NumericInput/PercentInput, Modal, Notice, Summary
-    │   ├── costing/                 ProductInfoCard, CostLineTable, MarketingTable,
-    │   │                            IndirectCostCard, CostSummaryCard
+    │   ├── costing/                 ProductInfoCard, ProductPhotoCard, CostLineTable,
+    │   │                            MarketingTable, IndirectCostCard, CostSummaryCard
     │   ├── pricing/                 PricingSummaryCard, ScenarioTable
+    │   ├── card/                    CostingPricingCard (screen + print)
     │   ├── settings/                SettingsDialog
     │   ├── print/                   CostSheet (printable / PDF cost sheet)
     │   ├── layout/                  AppShell (nav, New Costing, Print/Export, Settings)
@@ -57,11 +61,12 @@ Everything recalculates on every keystroke; nothing is hard-coded; every visible
     │
     ├── pages/
     │   ├── CostingPage.tsx
-    │   └── PricingPage.tsx
+    │   ├── PricingPage.tsx
+    │   └── CardPage.tsx
     │
     └── styles/
-        ├── global.css               Design system (dashboard UI)
-        └── print.css                A4 cost-sheet layout
+        ├── global.css               Design system (dashboard UI + card)
+        └── print.css                A4 cost sheet and A4 card layouts
 ```
 
 **Architecture rule:** the UI never calculates. `src/lib/calculations.ts` has no React import and no DOM
@@ -75,7 +80,9 @@ access, so the same engine can be reused by an API, an export service or a batch
 
 ```
 Total            = Quantity × Unit Price                       (read-only)
-VAT Amount       = Total × VAT Rate                            (default 14%, configurable)
+VAT Rate         = Settings rate (14% by default) when the line's VAT box is ticked
+                 = 0%              when it is not (the line is zero-rated)
+VAT Amount       = Total × VAT Rate
 Cost Incl. VAT   = Total + VAT Amount
 Cost Base        = Cost Incl. VAT   (VAT treatment = inclusive, default)
                  = Total            (VAT treatment = recoverable)
@@ -122,12 +129,12 @@ The Pricing page shows both figures side by side so the difference is explicit.
 
 ### Public engine functions
 
-`calculateLineTotal` · `calculateVatAmount` · `calculateTotalIncludingVat` · `calculateCostBase` ·
+`calculateLineTotal` · `resolveVatRate` · `calculateVatAmount` · `calculateTotalIncludingVat` · `calculateCostBase` ·
 `calculateAllocatedCost` · `calculateCostLine` · `calculateMarketingLine` · `calculateCostSection` ·
 `calculateDirectCost` · `calculateSampleCost` · `calculateMarketingCost` · `calculateBaseCostPerUnit` ·
 `calculateExchangeRateAdjustment` · `calculateTotalCostPerUnit` · `calculateCosting` ·
 `calculateSellingPrice` · `calculateGrossProfit` · `calculateGrossMargin` · `calculateMarkup` ·
-`calculateScenario` · `calculatePricing` · `safeDivide`
+`calculateScenario` · `calculatePricing` · `buildCostBreakdown` · `safeDivide`
 
 Every division goes through `safeDivide`, so a missing or zero Quantity Produced yields `0` — never
 `NaN` or `Infinity` — while validation tells the user what is wrong.
@@ -138,19 +145,21 @@ Every division goes through `safeDivide`, so a missing or zero Quantity Produced
 
 ```ts
 CostingModel {
-  id, product { name, code, category, costingDate,
+  id, product { name, code, category, costingDate, photo?,
                 supplier?, fabricType?, collection?, version?, createdBy?, approvalStatus? },
   quantityProduced,
-  directCosts:       CostLine[]      // description, quantity, measurementId, unitPrice, vatRate, allocate
+  directCosts:       CostLine[]      // description, quantity, measurementId, unitPrice, vatable, allocate
   sampleCosts:       CostLine[]      // identical shape to directCosts
-  marketingExpenses: MarketingLine[] // marketingTypeId, description, quantity, unitPrice, vatRate
+  marketingExpenses: MarketingLine[] // marketingTypeId, description, quantity, unitPrice, vatable
   overheadsPerUnit,
   exchangeRateValuation
 }
 
+ProductPhoto  { dataUrl, name, width, height, bytes }   // downscaled, stored in the model
+
 PricingModel  { targetGrossMargin, scenarioMargins[] }
 
-AppSettings   { currency, locale, defaultVatRate, vatTreatment,
+AppSettings   { currency, locale, vatRate, vatableByDefault, vatTreatment,
                 unallocatedTreatment, measurements[], marketingTypes[] }
 
 AppState      { costing, pricing, settings }     // persisted to localStorage
@@ -175,9 +184,18 @@ npm run lint
 
 Requires Node 18+ (developed on Node 22). No backend or database — the model persists in the browser.
 
-**Print / Export:** the *Print / Export* button opens the browser print dialog with a dedicated A4 cost
-sheet (product info, all four sections, costing summary, pricing summary, scenarios, sign-off lines).
-Choosing *Save as PDF* produces the PDF export.
+**Print / Export:** two printable documents share the same live model —
+
+* *Print / Export* in the header prints the **full cost sheet**: product info and photo, all four sections,
+  costing summary, pricing summary, scenarios and sign-off lines.
+* *Print / Export card* on page 3 prints the **Costing & Pricing Card**: one page with the photo, the cost
+  breakdown per unit and the selling price.
+
+Choosing *Save as PDF* in the print dialog produces the PDF export.
+
+**Product photo:** add it in the *Product Photo* section on the Costing page (click or drag and drop, JPG /
+PNG / WebP up to 10 MB). The picture is downscaled to 1,200px on its longest edge, re-encoded as JPEG and
+stored inside the model, so it appears on the card and both printed documents with no upload or server.
 
 ---
 
@@ -237,41 +255,46 @@ production expense `Yes` = spread over 1,000 units, net costing):
 The specification's own illustration is also asserted in the tests: base 160 → +15% → **184.00**, and
 184 ÷ (1 − 40%) → **306.67** with a 122.67 gross profit and a 66.67% mark-up.
 
-`npm test` → **20 passing tests**.
+`npm test` → **25 passing tests**.
 
 ---
 
 ## 6. Assumptions
 
-1. **Allocation = No.** The spec defines `Total Price = Total` for these lines, so by default the line is
+1. **VAT is a per-line checkbox.** Ticked, the line is taxed at the single rate configured in Settings
+   (14% by default); unticked, it is zero-rated and carries no VAT at all. Net, VAT amount and VAT-inclusive
+   amount are shown on every line, and changing the Settings rate immediately re-prices every ticked line.
+2. **Allocation = No.** The spec defines `Total Price = Total` for these lines, so by default the line is
    treated as a cost incurred **for every unit** and enters the cost per unit at its full amount
    (setting: *Count in full per unit*). Because that reading charges a lump-sum batch cost to each unit, the
    alternative — *Keep as lump sum*, which excludes it from the cost per unit and reports it separately as a
    total production cost — is available in **Settings** and shown in the summary as
    *Unallocated lump-sum costs*.
-2. **VAT treatment.** Defaults to **inclusive** (VAT is a real cost). If the business reclaims input VAT,
+3. **VAT treatment.** Defaults to **inclusive** (VAT is a real cost). If the business reclaims input VAT,
    switch to **recoverable** in Settings: cost bases become net and VAT is reported for information only.
-   Net, VAT amount and VAT-inclusive amount are always displayed on every line either way.
-3. **Exchange Rate Valuation** is a gross-up on the *whole* base cost per unit (direct + sample + marketing +
+4. **Exchange Rate Valuation** is a gross-up on the *whole* base cost per unit (direct + sample + marketing +
    overheads), exactly as specified — it is not restricted to imported materials.
-4. **Overheads Per Unit** is taken as already per-unit and is never divided by Quantity Produced.
-5. **Quantity Produced = 0** blocks nothing but yields 0 for allocated lines, with an explicit error message
+5. **Overheads Per Unit** is taken as already per-unit and is never divided by Quantity Produced.
+6. **Quantity Produced = 0** blocks nothing but yields 0 for allocated lines, with an explicit error message
    instead of a division-by-zero result.
-6. **Rounding** happens only at display time (2 decimals). Totals are computed at full precision, so summed
+7. **Rounding** happens only at display time (2 decimals). Totals are computed at full precision, so summed
    columns cannot drift by a piastre.
-7. **VAT rate is per line** (defaulted from Settings), so imported and local materials can carry different
-   rates; *Apply to every existing line* in Settings rewrites them in bulk.
-8. **Persistence** is the browser's localStorage — one active model per browser, no backend yet.
-9. **Currency** is a formatting label (default EGP); the app does not convert between currencies.
+8. **The product photo lives inside the model** as a compressed data URL (typically well under 300 KB), so it
+   survives a reload and travels with an export. If the browser refuses to store the model, the app says so
+   rather than losing the work silently.
+9. **Persistence** is the browser's localStorage — one active model per browser, no backend yet.
+10. **Currency** is a formatting label (default EGP); the app does not convert between currencies.
 
 ---
 
 ## 7. Future improvements
 
+- Multiple photos per product (front / back / detail) and a photo gallery on the card.
 - Save, list and load multiple costing models; costing versions with a side-by-side comparison view.
 - Backend + database (the model is already plain JSON and the storage layer is isolated in `lib/storage.ts`).
 - Supplier, fabric type, collection, user and approval workflow — fields already exist in `ProductInfo`.
-- Native Excel/CSV export (print-to-PDF is available today).
+- Native Excel/CSV export and a server-rendered PDF of the card (print-to-PDF is available today).
+- Per-line VAT rates for mixed-rate purchases (today VAT is one rate plus a per-line on/off switch).
 - Multi-currency with real exchange rates, per-material FX exposure instead of a single gross-up.
 - Landed-cost extras: freight, customs duty, wastage %, and a per-line yield/consumption factor.
 - Price ladders: wholesale vs retail margins, discount and markdown scenario planning.

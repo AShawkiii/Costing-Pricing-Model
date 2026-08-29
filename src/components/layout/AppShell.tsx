@@ -9,11 +9,13 @@ import { Modal } from '../ui/Modal';
 import { Notice } from '../ui/Notice';
 import { SettingsDialog } from '../settings/SettingsDialog';
 import { CostSheet } from '../print/CostSheet';
+import { CostingPricingCard } from '../card/CostingPricingCard';
+import { printDocument } from '../../lib/print';
 import { useApp } from '../../state/AppStateContext';
 import { useFormatters } from '../../hooks/useFormatters';
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const { dispatch, costing } = useApp();
+  const { dispatch, costing, persistenceFailed } = useApp();
   const f = useFormatters();
   const [confirmReset, setConfirmReset] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -36,7 +38,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <button className="btn btn--ghost-light btn--sm" onClick={() => setSettingsOpen(true)}>
               Settings
             </button>
-            <button className="btn btn--ghost-light btn--sm" onClick={() => window.print()}>
+            <button className="btn btn--ghost-light btn--sm" onClick={() => printDocument('sheet')}>
               Print / Export
             </button>
             <button className="btn btn--primary btn--sm" onClick={() => setConfirmReset(true)}>
@@ -52,10 +54,24 @@ export function AppShell({ children }: { children: ReactNode }) {
           <NavLink to="/pricing" className={({ isActive }) => (isActive ? 'active' : '')}>
             <span className="app-nav__step">2</span> Pricing
           </NavLink>
+          <NavLink to="/card" className={({ isActive }) => (isActive ? 'active' : '')}>
+            <span className="app-nav__step">3</span> Card
+          </NavLink>
         </nav>
       </header>
 
-      <main className="app-main screen-only">{children}</main>
+      <main className="app-main screen-only">
+        {persistenceFailed && (
+          <div style={{ maxWidth: 1560, margin: '0 auto 16px' }}>
+            <Notice tone="warn">
+              This browser refused to save the model locally — usually a full storage quota (a large product photo) or
+              private browsing. Your work still calculates normally, but it will be lost on reload. Print or export the
+              cost sheet to keep a copy.
+            </Notice>
+          </div>
+        )}
+        {children}
+      </main>
 
       {/* Confirmation before clearing the model */}
       <Modal
@@ -88,8 +104,11 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
 
-      {/* Hidden on screen, printed by the Print / Export button */}
+      {/* Hidden on screen; body[data-print] selects which one is printed */}
       <CostSheet />
+      <div className="print-card">
+        <CostingPricingCard />
+      </div>
     </div>
   );
 }

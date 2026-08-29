@@ -9,6 +9,7 @@ import type {
   CostLine,
   MarketingLine,
   ProductInfo,
+  ProductPhoto,
 } from '../types/model';
 import {
   createCostLine,
@@ -24,6 +25,8 @@ export type CostSectionKey = 'directCosts' | 'sampleCosts';
 export type Action =
   | { type: 'setQuantityProduced'; value: number }
   | { type: 'setProductField'; field: keyof ProductInfo; value: string }
+  | { type: 'setProductPhoto'; photo: ProductPhoto }
+  | { type: 'removeProductPhoto' }
   | { type: 'addCostLine'; section: CostSectionKey }
   | { type: 'updateCostLine'; section: CostSectionKey; id: string; patch: Partial<CostLine> }
   | { type: 'removeCostLine'; section: CostSectionKey; id: string }
@@ -37,7 +40,7 @@ export type Action =
   | { type: 'setTargetGrossMargin'; value: number }
   | { type: 'setScenarioMargins'; value: number[] }
   | { type: 'updateSettings'; patch: Partial<AppSettings> }
-  | { type: 'applyVatRateToAllLines'; value: number }
+  | { type: 'setVatableForAllLines'; value: boolean }
   | { type: 'loadState'; state: AppState }
   | { type: 'resetModel' };
 
@@ -66,6 +69,17 @@ export function reducer(state: AppState, action: Action): AppState {
         },
       };
 
+    case 'setProductPhoto':
+      return {
+        ...state,
+        costing: { ...state.costing, product: { ...state.costing.product, photo: action.photo } },
+      };
+
+    case 'removeProductPhoto': {
+      const { photo: _removed, ...product } = state.costing.product;
+      return { ...state, costing: { ...state.costing, product } };
+    }
+
     case 'addCostLine':
       return {
         ...state,
@@ -73,7 +87,7 @@ export function reducer(state: AppState, action: Action): AppState {
           ...state.costing,
           [action.section]: [
             ...state.costing[action.section],
-            createCostLine(state.settings.defaultVatRate),
+            createCostLine(state.settings.vatableByDefault),
           ],
         },
       };
@@ -112,7 +126,7 @@ export function reducer(state: AppState, action: Action): AppState {
           ...state.costing,
           marketingExpenses: [
             ...state.costing.marketingExpenses,
-            createMarketingLine(state.settings.defaultVatRate),
+            createMarketingLine(state.settings.vatableByDefault),
           ],
         },
       };
@@ -159,17 +173,17 @@ export function reducer(state: AppState, action: Action): AppState {
     case 'updateSettings':
       return { ...state, settings: { ...state.settings, ...action.patch } };
 
-    /** Applies a new VAT rate to every existing line (used by Settings). */
-    case 'applyVatRateToAllLines':
+    /** Ticks or unticks the VAT checkbox on every existing line (Settings). */
+    case 'setVatableForAllLines':
       return {
         ...state,
         costing: {
           ...state.costing,
-          directCosts: state.costing.directCosts.map((l) => ({ ...l, vatRate: action.value })),
-          sampleCosts: state.costing.sampleCosts.map((l) => ({ ...l, vatRate: action.value })),
+          directCosts: state.costing.directCosts.map((l) => ({ ...l, vatable: action.value })),
+          sampleCosts: state.costing.sampleCosts.map((l) => ({ ...l, vatable: action.value })),
           marketingExpenses: state.costing.marketingExpenses.map((l) => ({
             ...l,
-            vatRate: action.value,
+            vatable: action.value,
           })),
         },
       };
@@ -180,7 +194,7 @@ export function reducer(state: AppState, action: Action): AppState {
     /** New Costing: fresh model, user settings preserved. */
     case 'resetModel':
       return {
-        costing: createCostingModel(state.settings.defaultVatRate),
+        costing: createCostingModel(state.settings.vatableByDefault),
         pricing: createPricingModel(),
         settings: state.settings, // user preferences survive a new costing
       };

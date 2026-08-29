@@ -4,7 +4,8 @@
    page produces the same complete, professional document.
    ========================================================================== */
 
-.print-sheet { display: none; }
+.print-sheet,
+.print-card { display: none; }
 
 @media print {
   @page { size: A4; margin: 12mm; }
@@ -16,11 +17,15 @@
   .modal-backdrop,
   .screen-only { display: none !important; }
 
+  /* Which document is printed is chosen by lib/print.ts via body[data-print]. */
   .print-sheet {
     display: block;
     color: #000;
     font-family: 'Segoe UI', system-ui, Arial, sans-serif;
   }
+
+  body[data-print='card'] .print-sheet { display: none; }
+  body[data-print='card'] .print-card { display: block; }
 
   .print-sheet__header {
     display: flex;
@@ -108,4 +113,61 @@
   }
   .print-signoff { display: flex; gap: 30px; margin-top: 22px; }
   .print-signoff div { flex: 1; border-top: 1px solid #333; padding-top: 3px; font-size: 9px; }
+}
+
+/* ==========================================================================
+   Printable Costing & Pricing Card (body[data-print="card"])
+   Reuses the on-screen card component with print-safe colours and sizing.
+   ========================================================================== */
+
+@media print {
+  .print-card {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .print-card .cp-card {
+    max-width: none;
+    border: 1px solid #c8d2e0;
+    border-radius: 6px;
+    box-shadow: none;
+    break-inside: avoid;
+  }
+
+  .print-card .cp-card__banner {
+    background: #0f2544 !important;
+    color: #fff !important;
+    padding: 12px 16px;
+  }
+  .print-card .cp-card__name { font-size: 16px; }
+  .print-card .cp-card__eyebrow,
+  .print-card .cp-card__meta,
+  .print-card .cp-card__stamp { color: #c3d0e2 !important; font-size: 9px; }
+
+  .print-card .cp-card__grid { grid-template-columns: 210px minmax(0, 1fr); gap: 16px; padding: 14px 16px; }
+
+  .print-card .cp-photo { border: 1px solid #d5dbe4; }
+  .print-card .cp-fact { font-size: 9.5px; padding: 3px 0; }
+
+  .print-card .headline {
+    background: #0f2544 !important;
+    color: #fff !important;
+    padding: 9px 11px;
+    border-radius: 5px;
+  }
+  .print-card .headline--accent { background: #0e8f7e !important; }
+  .print-card .headline__label { font-size: 8.5px; color: #c3d0e2 !important; }
+  .print-card .headline__value { font-size: 18px; }
+  .print-card .headline__note { font-size: 8.5px; color: #c3d0e2 !important; }
+  .print-card .cp-headlines { grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  .print-card .cp-section-title { font-size: 9px; margin: 12px 0 3px; color: #6b7688; }
+  .print-card .breakdown-table { font-size: 9.5px; }
+  .print-card .breakdown-table th { font-size: 8px; padding: 4px 6px; border-bottom: 1px solid #c8d2e0; }
+  .print-card .breakdown-table td { padding: 4px 6px; border-bottom: 1px solid #e3e8ef; }
+  .print-card .breakdown-table tfoot td { background: #eef2f7 !important; border-top: 1.5px solid #0f2544; }
+  .print-card .share-bar__track { background: #e6ebf3 !important; width: 52px; }
+  .print-card .share-bar__fill { background: #0e8f7e !important; }
+
+  .print-card .cp-card__footer { background: #f5f7fa !important; padding: 8px 16px; font-size: 8.5px; }
 }

@@ -9,7 +9,7 @@
  */
 
 import { Card, OptionalBadge } from '../ui/Card';
-import { NumericInput, PercentInput } from '../ui/NumericInput';
+import { NumericInput } from '../ui/NumericInput';
 import { Notice } from '../ui/Notice';
 import { useApp } from '../../state/AppStateContext';
 import { useFormatters } from '../../hooks/useFormatters';
@@ -19,7 +19,7 @@ export function MarketingTable({ index, result }: { index: number; result: Marke
   const { state, dispatch } = useApp();
   const f = useFormatters();
   const lines = state.costing.marketingExpenses;
-  const { marketingTypes, vatTreatment } = state.settings;
+  const { marketingTypes, vatTreatment, vatRate } = state.settings;
   const quantityProduced = state.costing.quantityProduced;
 
   return (
@@ -54,7 +54,7 @@ export function MarketingTable({ index, result }: { index: number; result: Marke
                 <th className="num" style={{ width: 96 }}>Quantity</th>
                 <th className="num" style={{ width: 120 }}>Unit Price</th>
                 <th className="num" style={{ width: 118 }}>Total</th>
-                <th className="num" style={{ width: 128 }}>VAT</th>
+                <th className="num" style={{ width: 128 }}>VAT ({f.pct(vatRate)})</th>
                 <th className="num" style={{ width: 140 }}>Total Price</th>
                 <th style={{ width: 72 }} aria-label="Row actions" />
               </tr>
@@ -117,16 +117,21 @@ export function MarketingTable({ index, result }: { index: number; result: Marke
                     </td>
 
                     <td>
-                      <PercentInput
-                        value={line.vatRate}
-                        min={0}
-                        max={100}
-                        invalid={!(line.vatRate >= 0 && line.vatRate <= 1)}
-                        ariaLabel="VAT rate"
-                        onChange={(vatRate) => dispatch({ type: 'updateMarketingLine', id: line.id, patch: { vatRate } })}
-                      />
+                      <label className="vat-check">
+                        <input
+                          type="checkbox"
+                          checked={line.vatable}
+                          aria-label={`VAT applies at ${f.pct(vatRate)}`}
+                          onChange={(e) =>
+                            dispatch({ type: 'updateMarketingLine', id: line.id, patch: { vatable: e.target.checked } })
+                          }
+                        />
+                        <span>{line.vatable ? `VAT ${f.pct(vatRate)}` : 'No VAT'}</span>
+                      </label>
                       <span className="cell-note text-right">
-                        VAT {f.num(calc.vatAmount)} · incl. {f.num(calc.totalIncludingVat)}
+                        {line.vatable
+                          ? `${f.num(calc.vatAmount)} · incl. ${f.num(calc.totalIncludingVat)}`
+                          : 'zero-rated'}
                       </span>
                     </td>
 

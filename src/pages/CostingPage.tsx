@@ -5,6 +5,7 @@
  */
 
 import { ProductInfoCard } from '../components/costing/ProductInfoCard';
+import { ProductPhotoCard } from '../components/costing/ProductPhotoCard';
 import { CostLineTable } from '../components/costing/CostLineTable';
 import { MarketingTable } from '../components/costing/MarketingTable';
 import { IndirectCostCard } from '../components/costing/IndirectCostCard';
@@ -24,6 +25,8 @@ export function CostingPage() {
         <ValidationPanel issues={costingIssues} />
 
         <ProductInfoCard />
+
+        <ProductPhotoCard />
 
         <Notice tone="accent">
           <strong>Allocation rule.</strong> <em>Yes</em> spreads the line over the production run

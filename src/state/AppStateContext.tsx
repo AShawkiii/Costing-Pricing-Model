@@ -13,6 +13,7 @@ import {
   useEffect,
   useMemo,
   useReducer,
+  useState,
   type Dispatch,
   type ReactNode,
 } from 'react';
@@ -30,16 +31,20 @@ interface AppContextValue {
   pricing: PricingResult;
   costingIssues: ValidationIssue[];
   pricingIssues: ValidationIssue[];
+  /** True when the browser refused to persist the model (quota / private mode). */
+  persistenceFailed: boolean;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
 
 export function AppStateProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, undefined, loadState);
+  const [persistenceFailed, setPersistenceFailed] = useState(false);
 
   // Persist on every change (debounced by the browser's own event loop).
   useEffect(() => {
-    saveState(state);
+    const stored = saveState(state);
+    setPersistenceFailed((previous) => (previous === !stored ? previous : !stored));
   }, [state]);
 
   const costing = useMemo(
@@ -56,8 +61,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const pricingIssues = useMemo(() => validatePricing(state), [state]);
 
   const value = useMemo(
-    () => ({ state, dispatch, costing, pricing, costingIssues, pricingIssues }),
-    [state, costing, pricing, costingIssues, pricingIssues],
+    () => ({ state, dispatch, costing, pricing, costingIssues, pricingIssues, persistenceFailed }),
+    [state, costing, pricing, costingIssues, pricingIssues, persistenceFailed],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

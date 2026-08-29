@@ -48,8 +48,11 @@ export interface CostLine {
   quantity: number;
   measurementId: string;
   unitPrice: number;
-  /** VAT rate as a fraction, e.g. 0.14 for 14%. */
-  vatRate: number;
+  /**
+   * Is this line VATed? Ticked -> VAT is calculated at the rate configured in
+   * Settings (14% by default). Unticked -> the line carries no VAT at all.
+   */
+  vatable: boolean;
   /** Yes = spread the line over Quantity Produced. */
   allocate: boolean;
 }
@@ -61,9 +64,27 @@ export interface MarketingLine {
   description: string;
   quantity: number;
   unitPrice: number;
-  /** VAT rate as a fraction, e.g. 0.14 for 14%. */
-  vatRate: number;
+  /** Is this line VATed? See CostLine.vatable. */
+  vatable: boolean;
   /* Marketing expenses are ALWAYS allocated across Quantity Produced. */
+}
+
+/**
+ * A product photo held inside the model.
+ *
+ * Images are downscaled and re-encoded before they are stored (see
+ * lib/image.ts) so the model stays small enough to persist locally and to be
+ * sent to a backend later as an ordinary JSON field.
+ */
+export interface ProductPhoto {
+  /** Data URL (base64) of the compressed image. */
+  dataUrl: string;
+  /** Original file name, kept for the cost sheet and future uploads. */
+  name: string;
+  width: number;
+  height: number;
+  /** Size of the stored data URL in bytes. */
+  bytes: number;
 }
 
 /** Optional descriptive information about the product being costed. */
@@ -72,6 +93,8 @@ export interface ProductInfo {
   code: string;
   category: string;
   costingDate: string; // ISO yyyy-mm-dd
+  /** Optional product photo shown on the costing card and the cost sheet. */
+  photo?: ProductPhoto;
   /* Future-ready placeholders (kept in the model, not yet surfaced in the UI):
      supplier, fabricType, collection, version, user, approvalStatus. */
   supplier?: string;
@@ -86,8 +109,10 @@ export interface ProductInfo {
 export interface AppSettings {
   currency: string;
   locale: string;
-  /** Default VAT rate applied to new lines, as a fraction (0.14 = 14%). */
-  defaultVatRate: number;
+  /** VAT rate applied to every VATed line, as a fraction (0.14 = 14%). */
+  vatRate: number;
+  /** Are new cost lines created as VATed? */
+  vatableByDefault: boolean;
   vatTreatment: VatTreatment;
   unallocatedTreatment: UnallocatedTreatment;
   measurements: MeasurementOption[];

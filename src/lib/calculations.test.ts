@@ -9,6 +9,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  buildCostBreakdown,
   calculateAllocatedCost,
   calculateBaseCostPerUnit,
   calculateCosting,
@@ -18,6 +19,7 @@ import {
   calculateLineTotal,
   calculateMarkup,
   calculatePricing,
+  resolveVatRate,
   calculateSellingPrice,
   calculateTotalCostPerUnit,
   calculateVatAmount,
@@ -36,7 +38,7 @@ function line(partial: Partial<CostLine>): CostLine {
     quantity: partial.quantity ?? 0,
     measurementId: partial.measurementId ?? 'piece',
     unitPrice: partial.unitPrice ?? 0,
-    vatRate: partial.vatRate ?? 0.14,
+    vatable: partial.vatable ?? true,
     allocate: partial.allocate ?? true,
   };
 }
@@ -48,7 +50,7 @@ function marketing(partial: Partial<MarketingLine>): MarketingLine {
     description: partial.description ?? '',
     quantity: partial.quantity ?? 1,
     unitPrice: partial.unitPrice ?? 0,
-    vatRate: partial.vatRate ?? 0.14,
+    vatable: partial.vatable ?? true,
   };
 }
 
@@ -89,6 +91,66 @@ describe('line level', () => {
   });
 });
 
+describe('VAT checkbox', () => {
+  it('taxes a line at the configured rate only when it is ticked', () => {
+    expect(resolveVatRate(true, 0.14)).toBe(0.14);
+    expect(resolveVatRate(false, 0.14)).toBe(0);
+  });
+
+  it('charges no VAT on an unticked line', () => {
+    const result = calculateCosting(
+      model({
+        directCosts: [
+          line({ quantity: 1, unitPrice: 100, vatable: true }),
+          line({ quantity: 1, unitPrice: 100, vatable: false }),
+        ],
+      }),
+      settings,
+    );
+    expect(result.direct.lines[0].vatAmount).toBeCloseTo(14, 10);
+    expect(result.direct.lines[1].vatAmount).toBe(0);
+    expect(result.direct.lines[1].costBase).toBe(100); // net = incl. VAT
+    expect(result.direct.vatTotal).toBeCloseTo(14, 10);
+  });
+
+  it('follows the VAT rate configured in settings', () => {
+    const at20: AppSettings = { ...DEFAULT_SETTINGS, vatRate: 0.2 };
+    const result = calculateCosting(model({ directCosts: [line({ quantity: 1, unitPrice: 100 })] }), at20);
+    expect(result.direct.vatTotal).toBeCloseTo(20, 10);
+    expect(result.direct.total).toBeCloseTo(120, 10);
+  });
+});
+
+describe('cost breakdown', () => {
+  it('splits the total cost per unit into shares that add up to 100%', () => {
+    const result = calculateCosting(
+      model({
+        directCosts: [line({ quantity: 1, unitPrice: 120, allocate: false, vatable: false })],
+        marketingExpenses: [marketing({ quantity: 1, unitPrice: 15_000, vatable: false })],
+        overheadsPerUnit: 20,
+        exchangeRateValuation: 0.15,
+      }),
+      netSettings,
+    );
+    const rows = buildCostBreakdown(result);
+    expect(rows.map((r) => r.label)).toEqual([
+      'Direct Cost',
+      'Sample Cost',
+      'Marketing Expenses',
+      'Overheads',
+      'Exchange Rate Valuation',
+    ]);
+    expect(rows.reduce((sum, r) => sum + r.perUnit, 0)).toBeCloseTo(result.totalCostPerUnit, 10);
+    expect(rows.reduce((sum, r) => sum + r.share, 0)).toBeCloseTo(1, 10);
+    expect(rows[0].total).toBeCloseTo(120 * result.quantityProduced, 10);
+  });
+
+  it('reports zero shares instead of NaN when there is no cost yet', () => {
+    const rows = buildCostBreakdown(calculateCosting(model({}), settings));
+    expect(rows.every((r) => r.share === 0 && r.perUnit === 0)).toBe(true);
+  });
+});
+
 describe('sections', () => {
   it('treats an empty sample section as zero cost', () => {
     const result = calculateCosting(model({ directCosts: [line({ quantity: 1, unitPrice: 100 })] }), settings);
@@ -98,7 +160,7 @@ describe('sections', () => {
 
   it('always allocates marketing across the produced quantity', () => {
     const result = calculateCosting(
-      model({ marketingExpenses: [marketing({ quantity: 1, unitPrice: 20_000, vatRate: 0 })] }),
+      model({ marketingExpenses: [marketing({ quantity: 1, unitPrice: 20_000, vatable: false })] }),
       settings,
     );
     expect(result.marketing.perUnit).toBe(20); // 20,000 / 1,000
@@ -107,7 +169,7 @@ describe('sections', () => {
   it('excludes lump-sum lines from the per-unit cost under the total-only treatment', () => {
     const totalOnly: AppSettings = { ...netSettings, unallocatedTreatment: 'total-only' };
     const result = calculateCosting(
-      model({ directCosts: [line({ quantity: 1, unitPrice: 5000, allocate: false, vatRate: 0 })] }),
+      model({ directCosts: [line({ quantity: 1, unitPrice: 5000, allocate: false, vatable: false })] }),
       totalOnly,
     );
     expect(result.direct.perUnit).toBe(0);
@@ -229,14 +291,14 @@ describe('specification test case', () => {
     const intuitive = model({
       quantityProduced: 1000,
       directCosts: [
-        line({ quantity: 2.5, unitPrice: 200, allocate: false, vatRate: 0 }), // 500 per garment
-        line({ quantity: 1, unitPrice: 30, allocate: false, vatRate: 0 }), //    30 per garment
-        line({ quantity: 5000, unitPrice: 1, allocate: true, vatRate: 0 }), //  5,000 over the run
+        line({ quantity: 2.5, unitPrice: 200, allocate: false, vatable: false }), // 500 per garment
+        line({ quantity: 1, unitPrice: 30, allocate: false, vatable: false }), //    30 per garment
+        line({ quantity: 5000, unitPrice: 1, allocate: true, vatable: false }), //  5,000 over the run
       ],
-      sampleCosts: [line({ quantity: 2, unitPrice: 200, allocate: true, vatRate: 0 })],
+      sampleCosts: [line({ quantity: 2, unitPrice: 200, allocate: true, vatable: false })],
       marketingExpenses: [
-        marketing({ quantity: 1, unitPrice: 10_000, vatRate: 0 }),
-        marketing({ quantity: 1, unitPrice: 5_000, vatRate: 0 }),
+        marketing({ quantity: 1, unitPrice: 10_000, vatable: false }),
+        marketing({ quantity: 1, unitPrice: 5_000, vatable: false }),
       ],
       overheadsPerUnit: 20,
       exchangeRateValuation: 0.15,

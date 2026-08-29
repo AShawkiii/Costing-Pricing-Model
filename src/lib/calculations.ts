@@ -60,6 +60,16 @@ export function calculateTotalIncludingVat(netTotal: number, vatRate: number): n
 }
 
 /**
+ * The VAT rate that applies to a line.
+ *
+ * VAT is a checkbox per line: a VATed line uses the rate configured in
+ * Settings, a non-VATed line is simply zero-rated.
+ */
+export function resolveVatRate(vatable: boolean, vatRate: number): number {
+  return vatable ? toNumber(vatRate) : 0;
+}
+
+/**
  * The amount that actually enters the costing for a line.
  *  - VAT `inclusive`   -> Net + VAT (VAT is an unrecoverable cost)
  *  - VAT `recoverable` -> Net only  (VAT is reclaimed from the tax authority)
@@ -95,6 +105,8 @@ export interface CostLineResult {
   id: string;
   /** Quantity x Unit Price (net, excluding VAT). */
   netTotal: number;
+  /** 0 when the line is not VATed. */
+  vatRate: number;
   vatAmount: number;
   totalIncludingVat: number;
   /** Net or VAT-inclusive amount depending on the VAT treatment setting. */
@@ -109,16 +121,18 @@ export interface CostLineResult {
 export function calculateCostLine(
   line: CostLine,
   quantityProduced: number,
-  settings: Pick<AppSettings, 'vatTreatment' | 'unallocatedTreatment'>,
+  settings: Pick<AppSettings, 'vatTreatment' | 'unallocatedTreatment' | 'vatRate'>,
 ): CostLineResult {
   const netTotal = calculateLineTotal(line.quantity, line.unitPrice);
-  const vatAmount = calculateVatAmount(netTotal, line.vatRate);
-  const costBase = calculateCostBase(netTotal, line.vatRate, settings.vatTreatment);
+  const vatRate = resolveVatRate(line.vatable, settings.vatRate);
+  const vatAmount = calculateVatAmount(netTotal, vatRate);
+  const costBase = calculateCostBase(netTotal, vatRate, settings.vatTreatment);
   const totalPrice = calculateAllocatedCost(costBase, quantityProduced, line.allocate);
 
   return {
     id: line.id,
     netTotal,
+    vatRate,
     vatAmount,
     totalIncludingVat: netTotal + vatAmount,
     costBase,
@@ -134,6 +148,8 @@ export function calculateCostLine(
 export interface MarketingLineResult {
   id: string;
   netTotal: number;
+  /** 0 when the line is not VATed. */
+  vatRate: number;
   vatAmount: number;
   totalIncludingVat: number;
   costBase: number;
@@ -144,15 +160,17 @@ export interface MarketingLineResult {
 export function calculateMarketingLine(
   line: MarketingLine,
   quantityProduced: number,
-  settings: Pick<AppSettings, 'vatTreatment'>,
+  settings: Pick<AppSettings, 'vatTreatment' | 'vatRate'>,
 ): MarketingLineResult {
   const netTotal = calculateLineTotal(line.quantity, line.unitPrice);
-  const vatAmount = calculateVatAmount(netTotal, line.vatRate);
-  const costBase = calculateCostBase(netTotal, line.vatRate, settings.vatTreatment);
+  const vatRate = resolveVatRate(line.vatable, settings.vatRate);
+  const vatAmount = calculateVatAmount(netTotal, vatRate);
+  const costBase = calculateCostBase(netTotal, vatRate, settings.vatTreatment);
 
   return {
     id: line.id,
     netTotal,
+    vatRate,
     vatAmount,
     totalIncludingVat: netTotal + vatAmount,
     costBase,
@@ -190,7 +208,7 @@ export interface CostSectionResult {
 export function calculateCostSection(
   lines: CostLine[],
   quantityProduced: number,
-  settings: Pick<AppSettings, 'vatTreatment' | 'unallocatedTreatment'>,
+  settings: Pick<AppSettings, 'vatTreatment' | 'unallocatedTreatment' | 'vatRate'>,
 ): CostSectionResult {
   const results = lines.map((line) => calculateCostLine(line, quantityProduced, settings));
 
@@ -211,7 +229,7 @@ export function calculateCostSection(
 /** Direct Cost section (mandatory). */
 export function calculateDirectCost(
   model: Pick<CostingModel, 'directCosts' | 'quantityProduced'>,
-  settings: Pick<AppSettings, 'vatTreatment' | 'unallocatedTreatment'>,
+  settings: Pick<AppSettings, 'vatTreatment' | 'unallocatedTreatment' | 'vatRate'>,
 ): CostSectionResult {
   return calculateCostSection(model.directCosts, model.quantityProduced, settings);
 }
@@ -219,7 +237,7 @@ export function calculateDirectCost(
 /** Sample Cost section (optional - an empty section simply costs 0). */
 export function calculateSampleCost(
   model: Pick<CostingModel, 'sampleCosts' | 'quantityProduced'>,
-  settings: Pick<AppSettings, 'vatTreatment' | 'unallocatedTreatment'>,
+  settings: Pick<AppSettings, 'vatTreatment' | 'unallocatedTreatment' | 'vatRate'>,
 ): CostSectionResult {
   return calculateCostSection(model.sampleCosts, model.quantityProduced, settings);
 }
@@ -235,7 +253,7 @@ export interface MarketingSectionResult {
 /** Marketing section (optional). Every line is allocated over the quantity. */
 export function calculateMarketingCost(
   model: Pick<CostingModel, 'marketingExpenses' | 'quantityProduced'>,
-  settings: Pick<AppSettings, 'vatTreatment'>,
+  settings: Pick<AppSettings, 'vatTreatment' | 'vatRate'>,
 ): MarketingSectionResult {
   const results = model.marketingExpenses.map((line) =>
     calculateMarketingLine(line, model.quantityProduced, settings),
@@ -350,6 +368,41 @@ export function calculateCosting(model: CostingModel, settings: AppSettings): Co
     vatTotal: direct.vatTotal + sample.vatTotal + marketing.vatTotal,
     netTotal: direct.netTotal + sample.netTotal + marketing.netTotal,
   };
+}
+
+/* ========================================================================== *
+ * Cost breakdown (used by the Costing & Pricing Card)
+ * ========================================================================== */
+
+export interface CostBreakdownRow {
+  key: 'direct' | 'sample' | 'marketing' | 'overheads' | 'exchange';
+  label: string;
+  perUnit: number;
+  /** Per-unit amount x Quantity Produced. */
+  total: number;
+  /** Share of the Total Cost Per Unit, as a fraction (0.42 = 42%). */
+  share: number;
+}
+
+/**
+ * Flattens a costing result into the five cost buckets that make up the total
+ * cost per unit. The shares always add up to 100% because the buckets are the
+ * exact terms of the Total Cost Per Unit formula.
+ */
+export function buildCostBreakdown(result: CostingResult): CostBreakdownRow[] {
+  const rows: Array<Omit<CostBreakdownRow, 'total' | 'share'>> = [
+    { key: 'direct', label: 'Direct Cost', perUnit: result.direct.perUnit },
+    { key: 'sample', label: 'Sample Cost', perUnit: result.sample.perUnit },
+    { key: 'marketing', label: 'Marketing Expenses', perUnit: result.marketing.perUnit },
+    { key: 'overheads', label: 'Overheads', perUnit: result.overheadsPerUnit },
+    { key: 'exchange', label: 'Exchange Rate Valuation', perUnit: result.exchangeRateAdjustment },
+  ];
+
+  return rows.map((row) => ({
+    ...row,
+    total: row.perUnit * result.quantityProduced,
+    share: safeDivide(row.perUnit, result.totalCostPerUnit),
+  }));
 }
 
 /* ========================================================================== *

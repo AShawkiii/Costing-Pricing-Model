@@ -14,7 +14,7 @@ export function CostSheet() {
   const { state, costing, pricing } = useApp();
   const f = useFormatters();
   const { product, quantityProduced, directCosts, sampleCosts, marketingExpenses } = state.costing;
-  const { measurements, marketingTypes, vatTreatment } = state.settings;
+  const { measurements, marketingTypes, vatTreatment, vatRate } = state.settings;
 
   const measurementLabel = (id: string) => measurements.find((m) => m.id === id)?.label ?? '—';
   const marketingLabel = (id: string) => marketingTypes.find((t) => t.id === id)?.label ?? '—';
@@ -22,12 +22,21 @@ export function CostSheet() {
   return (
     <div className="print-sheet">
       <header className="print-sheet__header">
-        <div>
-          <div className="print-sheet__title">Product Cost &amp; Price Sheet</div>
-          <div className="print-sheet__subtitle">
-            {product.name || 'Untitled product'}
-            {product.code ? ` · ${product.code}` : ''}
-            {product.category ? ` · ${product.category}` : ''}
+        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+          {product.photo && (
+            <img
+              src={product.photo.dataUrl}
+              alt=""
+              style={{ width: 62, height: 62, objectFit: 'cover', border: '1px solid #d5dbe4', borderRadius: 4 }}
+            />
+          )}
+          <div>
+            <div className="print-sheet__title">Product Cost &amp; Price Sheet</div>
+            <div className="print-sheet__subtitle">
+              {product.name || 'Untitled product'}
+              {product.code ? ` · ${product.code}` : ''}
+              {product.category ? ` · ${product.category}` : ''}
+            </div>
           </div>
         </div>
         <div style={{ textAlign: 'right', fontSize: 9.5 }}>
@@ -40,7 +49,10 @@ export function CostSheet() {
       <div className="print-meta">
         <div><div className="k">Quantity Produced</div><div className="v">{f.int(quantityProduced)} units</div></div>
         <div><div className="k">Currency</div><div className="v">{f.currency}</div></div>
-        <div><div className="k">VAT treatment</div><div className="v">{vatTreatment === 'inclusive' ? 'Included in cost' : 'Recoverable'}</div></div>
+        <div>
+          <div className="k">VAT ({f.pct(vatRate)})</div>
+          <div className="v">{vatTreatment === 'inclusive' ? 'Included in cost' : 'Recoverable'}</div>
+        </div>
         <div><div className="k">Exchange Rate Valuation</div><div className="v">{f.pct(costing.exchangeRateValuation)}</div></div>
       </div>
 
@@ -53,7 +65,7 @@ export function CostSheet() {
             measurement: measurementLabel(l.measurementId),
             unitPrice: f.num(l.unitPrice),
             total: f.num(costing.direct.lines[i].netTotal),
-            vat: f.num(costing.direct.lines[i].vatAmount),
+            vat: l.vatable ? f.num(costing.direct.lines[i].vatAmount) : '—',
             allocation: l.allocate ? 'Yes' : 'No',
             totalPrice: f.num(costing.direct.lines[i].totalPrice),
           }))}
@@ -75,7 +87,7 @@ export function CostSheet() {
               measurement: measurementLabel(l.measurementId),
               unitPrice: f.num(l.unitPrice),
               total: f.num(costing.sample.lines[i].netTotal),
-              vat: f.num(costing.sample.lines[i].vatAmount),
+              vat: l.vatable ? f.num(costing.sample.lines[i].vatAmount) : '—',
               allocation: l.allocate ? 'Yes' : 'No',
               totalPrice: f.num(costing.sample.lines[i].totalPrice),
             }))}
@@ -107,7 +119,7 @@ export function CostSheet() {
                   <td className="num">{f.qty(l.quantity)}</td>
                   <td className="num">{f.num(l.unitPrice)}</td>
                   <td className="num">{f.num(costing.marketing.lines[i].netTotal)}</td>
-                  <td className="num">{f.num(costing.marketing.lines[i].vatAmount)}</td>
+                  <td className="num">{l.vatable ? f.num(costing.marketing.lines[i].vatAmount) : '—'}</td>
                   <td className="num">{f.num(costing.marketing.lines[i].totalPrice)}</td>
                 </tr>
               ))}

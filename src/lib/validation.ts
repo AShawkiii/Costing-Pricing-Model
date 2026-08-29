@@ -18,7 +18,7 @@ export const RULES = {
   quantityProduced: 'Quantity Produced is required and must be greater than 0.',
   quantity: 'Quantity must be 0 or greater.',
   unitPrice: 'Unit Price must be 0 or greater.',
-  vat: 'VAT must be between 0% and 100%.',
+  vat: 'The VAT rate must be between 0% and 100%.',
   exchangeRate: 'Exchange Rate Valuation must be between 0% and 100%.',
   overheads: 'Overheads Per Unit must be 0 or greater.',
   grossMargin: 'Gross Profit Margin must be at least 0% and less than 100%.',
@@ -32,9 +32,6 @@ function checkLine(line: CostLine | MarketingLine, path: string): ValidationIssu
   }
   if (!(line.unitPrice >= 0)) {
     issues.push({ level: 'error', field: `${path}.unitPrice`, message: RULES.unitPrice });
-  }
-  if (!(line.vatRate >= 0 && line.vatRate <= 1)) {
-    issues.push({ level: 'error', field: `${path}.vatRate`, message: RULES.vat });
   }
   return issues;
 }
@@ -61,6 +58,11 @@ export function validateCosting(state: AppState): ValidationIssue[] {
   costing.marketingExpenses.forEach((l, i) =>
     issues.push(...checkLine(l, `marketingExpenses.${i}`)),
   );
+
+  // The VAT rate is global (per-line VAT is a yes/no checkbox).
+  if (!(state.settings.vatRate >= 0 && state.settings.vatRate <= 1)) {
+    issues.push({ level: 'error', field: 'settings.vatRate', message: RULES.vat });
+  }
 
   if (!(costing.overheadsPerUnit >= 0)) {
     issues.push({ level: 'error', field: 'overheadsPerUnit', message: RULES.overheads });

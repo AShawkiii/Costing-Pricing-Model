@@ -8,7 +8,7 @@
  */
 
 import { Card, OptionalBadge, RequiredBadge } from '../ui/Card';
-import { NumericInput, PercentInput } from '../ui/NumericInput';
+import { NumericInput } from '../ui/NumericInput';
 import { Notice } from '../ui/Notice';
 import { useApp } from '../../state/AppStateContext';
 import { useFormatters } from '../../hooks/useFormatters';
@@ -29,7 +29,7 @@ export function CostLineTable({ section, index, title, subtitle, mandatory, empt
   const { state, dispatch } = useApp();
   const f = useFormatters();
   const lines = state.costing[section];
-  const { measurements, vatTreatment, unallocatedTreatment } = state.settings;
+  const { measurements, vatTreatment, unallocatedTreatment, vatRate } = state.settings;
   const quantityProduced = state.costing.quantityProduced;
 
   return (
@@ -64,7 +64,7 @@ export function CostLineTable({ section, index, title, subtitle, mandatory, empt
                 <th style={{ width: 120 }}>Measurement</th>
                 <th className="num" style={{ width: 118 }}>Unit Price</th>
                 <th className="num" style={{ width: 118 }}>Total</th>
-                <th className="num" style={{ width: 128 }}>VAT</th>
+                <th className="num" style={{ width: 128 }}>VAT ({f.pct(vatRate)})</th>
                 <th style={{ width: 108 }}>Allocation</th>
                 <th className="num" style={{ width: 140 }}>Total Price</th>
                 <th style={{ width: 72 }} aria-label="Row actions" />
@@ -75,7 +75,6 @@ export function CostLineTable({ section, index, title, subtitle, mandatory, empt
                 const calc = result.lines[i];
                 const invalidQty = !(line.quantity >= 0);
                 const invalidPrice = !(line.unitPrice >= 0);
-                const invalidVat = !(line.vatRate >= 0 && line.vatRate <= 1);
 
                 return (
                   <tr key={line.id}>
@@ -136,20 +135,28 @@ export function CostLineTable({ section, index, title, subtitle, mandatory, empt
                       <span className="cell-note">net</span>
                     </td>
 
-                    {/* VAT rate is editable per line; the amount is calculated */}
+                    {/* VAT is a checkbox: ticked = taxed at the Settings rate, unticked = zero */}
                     <td>
-                      <PercentInput
-                        value={line.vatRate}
-                        min={0}
-                        max={100}
-                        invalid={invalidVat}
-                        ariaLabel="VAT rate"
-                        onChange={(vatRate) =>
-                          dispatch({ type: 'updateCostLine', section, id: line.id, patch: { vatRate } })
-                        }
-                      />
+                      <label className="vat-check">
+                        <input
+                          type="checkbox"
+                          checked={line.vatable}
+                          aria-label={`VAT applies at ${f.pct(vatRate)}`}
+                          onChange={(e) =>
+                            dispatch({
+                              type: 'updateCostLine',
+                              section,
+                              id: line.id,
+                              patch: { vatable: e.target.checked },
+                            })
+                          }
+                        />
+                        <span>{line.vatable ? `VAT ${f.pct(vatRate)}` : 'No VAT'}</span>
+                      </label>
                       <span className="cell-note text-right">
-                        VAT {f.num(calc.vatAmount)} · incl. {f.num(calc.totalIncludingVat)}
+                        {line.vatable
+                          ? `${f.num(calc.vatAmount)} · incl. ${f.num(calc.totalIncludingVat)}`
+                          : 'zero-rated'}
                       </span>
                     </td>
 

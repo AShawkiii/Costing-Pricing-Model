@@ -63,23 +63,49 @@ export function SettingsDialog({ open, onClose }: { open: boolean; onClose: () =
           />
         </Field>
 
-        <Field label="Default VAT Rate" htmlFor="setting-vat" hint="Applied to new cost lines.">
+        <Field label="VAT Rate" htmlFor="setting-vat" hint="Applied to every line whose VAT box is ticked.">
           <PercentInput
             id="setting-vat"
-            value={settings.defaultVatRate}
+            value={settings.vatRate}
             min={0}
             max={100}
-            onChange={(defaultVatRate) => dispatch({ type: 'updateSettings', patch: { defaultVatRate } })}
+            invalid={!(settings.vatRate >= 0 && settings.vatRate <= 1)}
+            onChange={(vatRate) => dispatch({ type: 'updateSettings', patch: { vatRate } })}
           />
         </Field>
       </div>
 
-      <button
-        className="btn btn--secondary btn--sm"
-        onClick={() => dispatch({ type: 'applyVatRateToAllLines', value: settings.defaultVatRate })}
-      >
-        Apply {formatPercent(settings.defaultVatRate)} VAT to every existing line
-      </button>
+      <Field label="VAT on new lines" hint="Whether the VAT box is ticked when you add a row.">
+        <div className="toggle-group">
+          <button
+            aria-pressed={settings.vatableByDefault}
+            onClick={() => dispatch({ type: 'updateSettings', patch: { vatableByDefault: true } })}
+          >
+            VATed by default
+          </button>
+          <button
+            aria-pressed={!settings.vatableByDefault}
+            onClick={() => dispatch({ type: 'updateSettings', patch: { vatableByDefault: false } })}
+          >
+            No VAT by default
+          </button>
+        </div>
+      </Field>
+
+      <div className="inline-form">
+        <button
+          className="btn btn--secondary btn--sm"
+          onClick={() => dispatch({ type: 'setVatableForAllLines', value: true })}
+        >
+          Tick VAT ({formatPercent(settings.vatRate)}) on every line
+        </button>
+        <button
+          className="btn btn--secondary btn--sm"
+          onClick={() => dispatch({ type: 'setVatableForAllLines', value: false })}
+        >
+          Untick VAT on every line
+        </button>
+      </div>
 
       <Field label="VAT treatment in costing">
         <div className="toggle-group">

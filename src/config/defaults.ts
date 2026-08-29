@@ -49,37 +49,38 @@ export const DEFAULT_SCENARIO_MARGINS = [0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6];
 export const DEFAULT_SETTINGS: AppSettings = {
   currency: 'EGP',
   locale: 'en-EG',
-  defaultVatRate: DEFAULT_VAT_RATE,
+  vatRate: DEFAULT_VAT_RATE,
+  vatableByDefault: true,
   vatTreatment: 'inclusive',
   unallocatedTreatment: 'per-unit',
   measurements: DEFAULT_MEASUREMENTS,
   marketingTypes: DEFAULT_MARKETING_TYPES,
 };
 
-export function createCostLine(vatRate = DEFAULT_VAT_RATE) {
+export function createCostLine(vatable = true) {
   return {
     id: createId('line'),
     description: '',
     quantity: 0,
     measurementId: 'piece',
     unitPrice: 0,
-    vatRate,
+    vatable, // VAT is a checkbox: ticked = taxed at the Settings rate
     allocate: true, // Allocation defaults to Yes
   };
 }
 
-export function createMarketingLine(vatRate = DEFAULT_VAT_RATE) {
+export function createMarketingLine(vatable = true) {
   return {
     id: createId('mkt'),
     marketingTypeId: 'ugc',
     description: '',
     quantity: 1,
     unitPrice: 0,
-    vatRate,
+    vatable,
   };
 }
 
-export function createCostingModel(vatRate = DEFAULT_VAT_RATE): CostingModel {
+export function createCostingModel(vatable = true): CostingModel {
   return {
     id: createId('costing'),
     product: {
@@ -91,7 +92,7 @@ export function createCostingModel(vatRate = DEFAULT_VAT_RATE): CostingModel {
       approvalStatus: 'draft',
     },
     quantityProduced: 1000,
-    directCosts: [createCostLine(vatRate)],
+    directCosts: [createCostLine(vatable)],
     sampleCosts: [],
     marketingExpenses: [],
     overheadsPerUnit: 0,

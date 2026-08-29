@@ -62,6 +62,9 @@ export function CostSummaryCard() {
           <Link className="btn btn--secondary btn--sm" to="/pricing" style={{ marginTop: 10, width: '100%', justifyContent: 'center' }}>
             Continue to Pricing →
           </Link>
+          <Link className="btn btn--secondary btn--sm" to="/card" style={{ marginTop: 8, width: '100%', justifyContent: 'center' }}>
+            View Costing &amp; Pricing Card →
+          </Link>
         </div>
       </div>
     </div>

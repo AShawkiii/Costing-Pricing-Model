@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppShell } from './components/layout/AppShell';
+import { CardPage } from './pages/CardPage';
 import { CostingPage } from './pages/CostingPage';
 import { PricingPage } from './pages/PricingPage';
 
@@ -10,6 +11,7 @@ export default function App() {
         <Route path="/" element={<Navigate to="/costing" replace />} />
         <Route path="/costing" element={<CostingPage />} />
         <Route path="/pricing" element={<PricingPage />} />
+        <Route path="/card" element={<CardPage />} />
         <Route path="*" element={<Navigate to="/costing" replace />} />
       </Routes>
     </AppShell>
