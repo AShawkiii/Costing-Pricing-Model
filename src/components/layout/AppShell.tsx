@@ -29,7 +29,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <div>
               <div className="app-brand__title">Costing &amp; Pricing Model</div>
               <div className="app-brand__subtitle">
-                Total cost per unit · {f.money(costing.totalCostPerUnit)}
+                v{__APP_VERSION__} · Total cost per unit · {f.money(costing.totalCostPerUnit)}
               </div>
             </div>
           </div>
