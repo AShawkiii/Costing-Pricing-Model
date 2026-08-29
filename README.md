@@ -1,9 +1,10 @@
-# Costing & Pricing Model
+# Finance Support
 
-A production-ready web app for a fashion / manufacturing business that calculates the **true cost per unit**
-of a product and the **selling price required to hit a target gross profit margin**.
+A finance & accounting workspace built as a platform: each area of the finance function is a **module**, the
+shell routes and presents them, and the home page is the launcher.
 
-Three pages, one live model:
+**Module 1 — Costing & Pricing** (built): the true cost per unit of a product and the selling price required
+to hit a target gross profit margin.
 
 | Page | Purpose |
 | --- | --- |
@@ -11,7 +12,21 @@ Three pages, one live model:
 | **2 · Pricing** | Target gross margin → **Recommended Selling Price**, mark-up, scenario table |
 | **3 · Card** | **Costing & Pricing Card** — one approval-ready page: photo, cost broken down per unit, selling price |
 
+**Planned modules** (listed on the home page, not built): Budgeting & Forecasting · Invoicing & Receivables ·
+Purchasing & Payables · Inventory & Stock Valuation · General Ledger · Fixed Assets · Payroll ·
+Cash & Treasury · Tax & VAT Returns · Financial Reporting. They appear as a roadmap only — nothing in the UI
+links to or pretends to run a module that does not exist.
+
 Everything recalculates on every keystroke; nothing is hard-coded; every visible button works.
+
+## Adding a module
+
+1. Create `src/modules/<id>/` exporting an `AvailableModule` (pages, state provider, header actions, print
+   documents, home-tile summary — see `src/modules/costing-pricing/index.tsx`).
+2. Add it to `MODULES` in `src/shell/modules.ts`.
+
+Routing, navigation, the module switcher and the home page all derive from that registry; the shell needs no
+other change. Modules never import each other — they share only `@shared/*`.
 
 ---
 
@@ -19,58 +34,44 @@ Everything recalculates on every keystroke; nothing is hard-coded; every visible
 
 ```
 ├── index.html
-├── package.json
-├── vite.config.ts
+├── vite.config.ts               aliases: @shared, @shell, @modules
+├── vite.standalone.config.ts    single-file build
+├── scripts/inline-standalone.mjs
 └── src/
-    ├── main.tsx                     App entry (HashRouter + state provider)
-    ├── App.tsx                      Routes: /costing, /pricing
+    ├── main.tsx                 entry: router, system status, module providers
+    ├── App.tsx                  routes derived from the module registry
     │
-    ├── types/
-    │   └── model.ts                 Data model (plain, serialisable interfaces)
+    ├── shell/                   ── the Finance Support platform ──
+    │   ├── modules.ts           MODULE REGISTRY: available + planned modules
+    │   ├── AppShell.tsx         brand, module switcher, module nav and actions
+    │   └── HomePage.tsx         launcher: module tiles + roadmap
     │
-    ├── lib/                         ── framework-free core ──
-    │   ├── calculations.ts          THE CALCULATION ENGINE (pure functions)
-    │   ├── calculations.test.ts     Unit tests + the specification test case
-    │   ├── validation.ts            Validation rules (pure)
-    │   ├── format.ts                EGP / percentage / thousands formatting
-    │   ├── image.ts                 Product photo: validation + downscaling
-    │   ├── print.ts                 Chooses which document the browser prints
-    │   ├── storage.ts               localStorage persistence + model migration
-    │   └── id.ts                    Row id generator
+    ├── shared/                  ── reusable by every module ──
+    │   ├── ui/                  Card, Field, NumericInput, Modal, Notice, Summary
+    │   ├── lib/                 format.ts, id.ts, print.ts
+    │   └── state/SystemStatus.tsx  modules report issues, the shell shows them
     │
-    ├── config/
-    │   └── defaults.ts              Measurements, marketing types, VAT default, factories
-    │
-    ├── state/
-    │   ├── store.ts                 Reducer (all state transitions)
-    │   └── AppStateContext.tsx      React binding + derived results (memoised)
-    │
-    ├── hooks/
-    │   └── useFormatters.ts         Formatting bound to the user's currency/locale
-    │
-    ├── components/
-    │   ├── ui/                      Card, Field, NumericInput/PercentInput, Modal, Notice, Summary
-    │   ├── costing/                 ProductInfoCard, ProductPhotoCard, CostLineTable,
-    │   │                            MarketingTable, IndirectCostCard, CostSummaryCard
-    │   ├── pricing/                 PricingSummaryCard, ScenarioTable
-    │   ├── card/                    CostingPricingCard (screen + print)
-    │   ├── settings/                SettingsDialog
-    │   ├── print/                   CostSheet (printable / PDF cost sheet)
-    │   ├── layout/                  AppShell (nav, New Costing, Print/Export, Settings)
-    │   └── ValidationPanel.tsx
-    │
-    ├── pages/
-    │   ├── CostingPage.tsx
-    │   ├── PricingPage.tsx
-    │   └── CardPage.tsx
+    ├── modules/
+    │   └── costing-pricing/     ── module 1, self-contained ──
+    │       ├── index.tsx        module definition handed to the registry
+    │       ├── types/model.ts   data model
+    │       ├── lib/             calculations.ts (engine) + tests, validation,
+    │       │                    storage, image
+    │       ├── config/defaults.ts
+    │       ├── state/           store.ts (reducer), AppStateContext.tsx
+    │       ├── hooks/useFormatters.ts
+    │       ├── components/      costing/, pricing/, card/, print/, settings/
+    │       ├── pages/           CostingPage, PricingPage, CardPage
+    │       └── styles/module.css
     │
     └── styles/
-        ├── global.css               Design system (dashboard UI + card)
-        └── print.css                A4 cost sheet and A4 card layouts
+        ├── global.css           design system + shell chrome
+        └── print.css            page setup, print-target switching, print primitives
 ```
 
-**Architecture rule:** the UI never calculates. `src/lib/calculations.ts` has no React import and no DOM
-access, so the same engine can be reused by an API, an export service or a batch job.
+**Architecture rules.** The UI never calculates: `src/modules/costing-pricing/lib/calculations.ts` has no
+React import and no DOM access, so the same engine can be reused by an API, an export service or a batch job.
+Modules never import one another — anything two modules need lives in `src/shared/`.
 
 ---
 
@@ -162,7 +163,8 @@ PricingModel  { targetGrossMargin, scenarioMargins[] }
 AppSettings   { currency, locale, vatRate, vatableByDefault, vatTreatment,
                 unallocatedTreatment, measurements[], marketingTypes[] }
 
-AppState      { costing, pricing, settings }     // persisted to localStorage
+AppState      { costing, pricing, settings }     // persisted under
+                                                // finance-support:costing-pricing:v1
 ```
 
 Calculated totals are **never stored** — they are derived from the model by the engine
@@ -184,7 +186,7 @@ npm run lint
 ```
 
 **No-install option.** `npm run build:standalone` writes
-`dist-standalone/costing-pricing-model.html` — the entire app (markup, styles, bundle) in a single file that
+`dist-standalone/finance-support.html` — the entire app (markup, styles, bundle) in a single file that
 runs by double-clicking it: no server, no install, no network. Handy for sharing the tool with someone who
 does not develop, or for keeping a frozen copy of a costing session.
 
@@ -214,7 +216,7 @@ Input: Quantity Produced 1,000 · Milton Fabric 2.5 Meter @200 (Alloc **Yes**) �
 · Production Expense 5,000 @1 (Alloc **No**) · Sample Fabric 2 Meter @200 (Alloc **Yes**) · UGC Fees 10,000
 · Shooting Expense 5,000 · Overheads 20 · Exchange Rate 15% · Target margin 40%.
 
-Both results below are produced by the app (unit-tested in `src/lib/calculations.test.ts` and verified in
+Both results below are produced by the app (unit-tested in `src/modules/costing-pricing/lib/calculations.test.ts` and verified in
 the browser).
 
 **A · VAT recoverable (net costing)** — isolates the allocation and gross-up rules:
@@ -291,16 +293,22 @@ The specification's own illustration is also asserted in the tests: base 160 →
 8. **The product photo lives inside the model** as a compressed data URL (typically well under 300 KB), so it
    survives a reload and travels with an export. If the browser refuses to store the model, the app says so
    rather than losing the work silently.
-9. **Persistence** is the browser's localStorage — one active model per browser, no backend yet.
+9. **Persistence** is the browser's localStorage, namespaced per module
+   (`finance-support:costing-pricing:v1`, migrated from the pre-platform key) — one active model per browser,
+   no backend yet.
 10. **Currency** is a formatting label (default EGP); the app does not convert between currencies.
 
 ---
 
 ## 7. Future improvements
 
+- The planned modules above, starting with the one the business needs next.
+- A shared company/entity record (name, logo, currency, fiscal year) used by every module and its documents.
+- Cross-module links once a second module exists — a costing feeding a budget line, an invoice priced from a
+  costing card.
 - Multiple photos per product (front / back / detail) and a photo gallery on the card.
 - Save, list and load multiple costing models; costing versions with a side-by-side comparison view.
-- Backend + database (the model is already plain JSON and the storage layer is isolated in `lib/storage.ts`).
+- Backend + database (the model is already plain JSON and the storage layer is isolated in the module's `lib/storage.ts`).
 - Supplier, fabric type, collection, user and approval workflow — fields already exist in `ProductInfo`.
 - Native Excel/CSV export and a server-rendered PDF of the card (print-to-PDF is available today).
 - Per-line VAT rates for mixed-rate purchases (today VAT is one rate plus a per-line on/off switch).

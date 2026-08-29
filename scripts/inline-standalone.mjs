@@ -7,7 +7,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const DIST = 'dist-standalone';
-const OUT = join(DIST, 'costing-pricing-model.html');
+const OUT = join(DIST, 'finance-support.html');
 
 const css = readFileSync(join(DIST, 'app.css'), 'utf8');
 // A closing tag inside a JS string would end the <script> element early.
@@ -19,7 +19,7 @@ const html = `<!doctype html>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Costing &amp; Pricing Model v${version}</title>
+    <title>Finance Support v${version}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
