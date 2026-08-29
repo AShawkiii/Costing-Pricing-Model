@@ -175,12 +175,21 @@ The model is plain JSON: ready for a database, versioning, or an export endpoint
 
 ```bash
 npm install
-npm run dev        # http://localhost:5173
-npm test           # calculation engine + specification test case
-npm run build      # type-check + production build into dist/
-npm run preview    # serve the production build
+npm run dev              # http://localhost:5173
+npm test                 # calculation engine + specification test case
+npm run build            # type-check + production build into dist/
+npm run preview          # serve the production build
+npm run build:standalone # one self-contained .html file (see below)
 npm run lint
 ```
+
+**No-install option.** `npm run build:standalone` writes
+`dist-standalone/costing-pricing-model.html` — the entire app (markup, styles, bundle) in a single file that
+runs by double-clicking it: no server, no install, no network. Handy for sharing the tool with someone who
+does not develop, or for keeping a frozen copy of a costing session.
+
+The app version is shown in the header (e.g. `v1.1.0 · Total cost per unit · …`), so you can always tell
+which build you are looking at.
 
 Requires Node 18+ (developed on Node 22). No backend or database — the model persists in the browser.
 
