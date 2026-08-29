@@ -1,0 +1,15 @@
+import { chromium } from 'playwright';
+const SP = process.env.SP;
+const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const p = await b.newPage({ viewport: { width: 1300, height: 900 } });
+await p.goto('http://localhost:5199/#/card');
+await p.waitForSelector('.app-main .cp-card');
+await p.emulateMedia({ media: 'print' });
+await p.evaluate(() => { document.body.dataset.print = 'card'; });
+const cbox = await p.locator('.print-card .cp-photo').boundingBox();
+console.log('print card photo:', cbox.width.toFixed(0) + '×' + cbox.height.toFixed(0), 'ratio', (cbox.width/cbox.height).toFixed(3));
+await p.screenshot({ path: SP + '/34-print-card-fit.png' });
+await p.evaluate(() => { document.body.dataset.print = 'sheet'; });
+const sbox = await p.locator('.print-sheet img').boundingBox();
+console.log('cost sheet thumb:', sbox.width.toFixed(0) + '×' + sbox.height.toFixed(0), 'ratio', (sbox.width/sbox.height).toFixed(3));
+await b.close();

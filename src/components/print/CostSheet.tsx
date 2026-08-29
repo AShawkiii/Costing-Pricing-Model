@@ -27,7 +27,7 @@ export function CostSheet() {
             <img
               src={product.photo.dataUrl}
               alt=""
-              style={{ width: 62, height: 62, objectFit: 'cover', border: '1px solid #d5dbe4', borderRadius: 4 }}
+              style={{ width: 'auto', height: 62, maxWidth: 84, objectFit: 'contain', border: '1px solid #d5dbe4', borderRadius: 4 }}
             />
           )}
           <div>

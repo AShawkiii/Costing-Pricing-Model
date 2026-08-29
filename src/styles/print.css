@@ -146,7 +146,10 @@
 
   .print-card .cp-card__grid { grid-template-columns: 210px minmax(0, 1fr); gap: 16px; padding: 14px 16px; }
 
-  .print-card .cp-photo { border: 1px solid #d5dbe4; }
+  .print-card .cp-photo {
+    border: 1px solid #d5dbe4;
+    width: min(100%, calc(260px * var(--photo-ratio, 1)));
+  }
   .print-card .cp-fact { font-size: 9.5px; padding: 3px 0; }
 
   .print-card .headline {

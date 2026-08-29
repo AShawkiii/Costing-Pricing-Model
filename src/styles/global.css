@@ -537,13 +537,16 @@ button { font: inherit; }
 .dropzone__hint { font-size: 12.5px; color: var(--ink-muted); margin-top: 3px; }
 
 .photo-row { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+/* The whole picture is shown, never cropped: the frame takes the photo's own
+   proportions (portrait garment shots included) up to a fixed height. */
 .photo-preview {
-  width: 190px;
-  height: 190px;
-  object-fit: cover;
+  height: 200px;
+  width: auto;
+  max-width: 260px;
+  object-fit: contain;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
-  background: #fff;
+  background: var(--surface-alt);
 }
 .photo-meta { flex: 1; min-width: 220px; font-size: 12.5px; }
 .photo-meta__name { font-weight: 600; font-size: 13.5px; color: var(--ink); word-break: break-word; }
@@ -583,15 +586,24 @@ button { font: inherit; }
 }
 @media (max-width: 860px) { .cp-card__grid { grid-template-columns: minmax(0, 1fr); } }
 
+/* Same rule on the card. --photo-ratio is set inline from the stored image
+   dimensions, so the frame takes the photo's exact proportions: the width is
+   whichever is smaller, the column or the width a 430px-tall photo needs.
+   Nothing is cropped and no empty bars are left around the picture. */
 .cp-photo {
-  width: 100%;
-  aspect-ratio: 1 / 1;
-  object-fit: cover;
+  display: block;
+  margin: 0 auto;
+  width: min(100%, calc(430px * var(--photo-ratio, 1)));
+  aspect-ratio: var(--photo-ratio, 1);
+  height: auto;
+  object-fit: contain;
   border-radius: var(--radius);
   border: 1px solid var(--border);
   background: var(--surface-alt);
 }
 .cp-photo--empty {
+  width: 100%;
+  aspect-ratio: 1 / 1;
   display: grid;
   place-items: center;
   color: var(--ink-muted);

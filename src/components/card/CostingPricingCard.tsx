@@ -6,6 +6,8 @@
  * card, so what the user approves is exactly what is printed.
  */
 
+import type { CSSProperties } from 'react';
+
 import { buildCostBreakdown } from '../../lib/calculations';
 import { useApp } from '../../state/AppStateContext';
 import { useFormatters } from '../../hooks/useFormatters';
@@ -37,7 +39,14 @@ export function CostingPricingCard() {
       <div className="cp-card__grid">
         <div>
           {product.photo ? (
-            <img className="cp-photo" src={product.photo.dataUrl} alt={`Product photo of ${product.name || 'the product'}`} />
+            <img
+              className="cp-photo"
+              src={product.photo.dataUrl}
+              alt={`Product photo of ${product.name || 'the product'}`}
+              /* The frame follows the photo's real proportions, so nothing is
+                 cropped and no empty bars are left around it. */
+              style={{ '--photo-ratio': product.photo.width / product.photo.height } as CSSProperties}
+            />
           ) : (
             <div className="cp-photo cp-photo--empty">
               No product photo yet — add one in the Product Photo section on the Costing page.
