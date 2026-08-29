@@ -1,0 +1,111 @@
+/* ==========================================================================
+   Print / Export layout — a management-ready cost sheet.
+   The printable sheet lives in the DOM but is hidden on screen; printing any
+   page produces the same complete, professional document.
+   ========================================================================== */
+
+.print-sheet { display: none; }
+
+@media print {
+  @page { size: A4; margin: 12mm; }
+
+  body { background: #fff; font-size: 10.5px; }
+
+  .app-header,
+  .app-main,
+  .modal-backdrop,
+  .screen-only { display: none !important; }
+
+  .print-sheet {
+    display: block;
+    color: #000;
+    font-family: 'Segoe UI', system-ui, Arial, sans-serif;
+  }
+
+  .print-sheet__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    border-bottom: 2px solid #0f2544;
+    padding-bottom: 8px;
+    margin-bottom: 12px;
+  }
+  .print-sheet__title { font-size: 17px; font-weight: 700; color: #0f2544; }
+  .print-sheet__subtitle { font-size: 10.5px; color: #555; margin-top: 2px; }
+
+  .print-meta {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px 14px;
+    margin-bottom: 14px;
+  }
+  .print-meta div { border: 1px solid #d5dbe4; padding: 5px 7px; border-radius: 4px; }
+  .print-meta dt, .print-meta .k {
+    font-size: 8.5px; text-transform: uppercase; letter-spacing: 0.05em; color: #6b7688; font-weight: 700;
+  }
+  .print-meta .v { font-size: 11px; font-weight: 600; }
+
+  .print-section { margin-bottom: 13px; break-inside: avoid; }
+  .print-section h3 {
+    font-size: 11.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #0f2544;
+    border-bottom: 1px solid #0f2544;
+    padding-bottom: 3px;
+    margin-bottom: 6px;
+  }
+
+  .print-table { width: 100%; border-collapse: collapse; font-size: 9.5px; }
+  .print-table th {
+    background: #eef2f7;
+    border: 1px solid #c8d2e0;
+    padding: 4px 5px;
+    text-align: left;
+    font-size: 8.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  .print-table td { border: 1px solid #d5dbe4; padding: 4px 5px; }
+  .print-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .print-table tfoot td { background: #f5f7fa; font-weight: 700; }
+
+  .print-summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+  .print-kv { width: 100%; border-collapse: collapse; font-size: 10px; }
+  .print-kv td { padding: 3px 0; border-bottom: 1px dotted #ccd3de; }
+  .print-kv td:last-child { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .print-kv tr.total td {
+    border-top: 1.5px solid #0f2544;
+    border-bottom: none;
+    padding-top: 5px;
+    font-size: 11.5px;
+    font-weight: 700;
+    color: #0f2544;
+  }
+
+  .print-highlight {
+    margin-top: 6px;
+    border: 1.5px solid #0f2544;
+    background: #eef2f7;
+    padding: 6px 9px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 700;
+  }
+  .print-highlight .label { font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .print-highlight .value { font-size: 14px; }
+
+  .print-footer {
+    margin-top: 16px;
+    padding-top: 6px;
+    border-top: 1px solid #c8d2e0;
+    display: flex;
+    justify-content: space-between;
+    font-size: 8.5px;
+    color: #6b7688;
+  }
+  .print-signoff { display: flex; gap: 30px; margin-top: 22px; }
+  .print-signoff div { flex: 1; border-top: 1px solid #333; padding-top: 3px; font-size: 9px; }
+}
