@@ -22,6 +22,9 @@ export function loadState(): AppState {
       costing: { ...base.costing, ...parsed.costing },
       pricing: { ...base.pricing, ...parsed.pricing },
       settings: { ...DEFAULT_SETTINGS, ...parsed.settings },
+      savedProductId: parsed.savedProductId ?? null,
+      savedAt: parsed.savedAt ?? null,
+      savedHash: parsed.savedHash ?? null,
     };
     return migrate(state, parsed);
   } catch {

@@ -81,6 +81,33 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
+/** Edge length of the thumbnail stored alongside a saved product. */
+export const THUMBNAIL_EDGE = 200;
+
+/**
+ * Makes a small JPEG from an existing photo data URL, so the Product Library
+ * list can show every product without loading full-size pictures.
+ * Returns null when there is no photo or the browser cannot draw it.
+ */
+export async function createThumbnail(dataUrl: string | undefined, maxEdge = THUMBNAIL_EDGE): Promise<string | null> {
+  if (!dataUrl) return null;
+  try {
+    const image = await loadImage(dataUrl);
+    const { width, height } = calculateScaledDimensions(image.naturalWidth, image.naturalHeight, maxEdge);
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, width, height);
+    ctx.drawImage(image, 0, 0, width, height);
+    return canvas.toDataURL('image/jpeg', 0.7);
+  } catch {
+    return null;
+  }
+}
+
 /** "184.2 KB" — used to reassure the user the stored photo is small. */
 export function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;

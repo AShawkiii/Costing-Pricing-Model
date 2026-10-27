@@ -15,8 +15,20 @@ export default defineConfig({
       '@modules': fileURLToPath(new URL('./src/modules', import.meta.url)),
     },
   },
+  server: {
+    // The dev server proxies the API so the browser talks to one origin.
+    proxy: {
+      '/api': {
+        target: process.env.API_URL ?? 'http://localhost:4000',
+        changeOrigin: true,
+      },
+    },
+  },
   // Exposed in the header so the running build is identifiable at a glance.
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
+    // The standalone single-file build overrides this to false: it runs from
+    // the filesystem with no server to talk to.
+    __API_ENABLED__: 'true',
   },
 })

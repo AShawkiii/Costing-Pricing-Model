@@ -42,6 +42,8 @@ export type Action =
   | { type: 'updateSettings'; patch: Partial<AppSettings> }
   | { type: 'setVatableForAllLines'; value: boolean }
   | { type: 'loadState'; state: AppState }
+  | { type: 'markSaved'; productId: string; savedAt: string; savedHash: string }
+  | { type: 'unlinkSavedProduct' }
   | { type: 'resetModel' };
 
 function replaceLine<T extends { id: string }>(lines: T[], id: string, patch: Partial<T>): T[] {
@@ -191,12 +193,28 @@ export function reducer(state: AppState, action: Action): AppState {
     case 'loadState':
       return action.state;
 
+    /** The workspace now matches a row in the database. */
+    case 'markSaved':
+      return {
+        ...state,
+        savedProductId: action.productId,
+        savedAt: action.savedAt,
+        savedHash: action.savedHash,
+      };
+
+    /** Keeps the figures but detaches them from the saved product. */
+    case 'unlinkSavedProduct':
+      return { ...state, savedProductId: null, savedAt: null, savedHash: null };
+
     /** New Costing: fresh model, user settings preserved. */
     case 'resetModel':
       return {
         costing: createCostingModel(state.settings.vatableByDefault),
         pricing: createPricingModel(),
         settings: state.settings, // user preferences survive a new costing
+        savedProductId: null, // a new costing is not yet a saved product
+        savedAt: null,
+        savedHash: null,
       };
 
     default:

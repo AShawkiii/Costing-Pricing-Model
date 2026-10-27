@@ -11,13 +11,16 @@ to hit a target gross profit margin.
 | **1 · Costing** | Product info & photo, Direct Cost, Sample Cost, Marketing Expenses, Indirect Cost → **Total Cost Per Unit** |
 | **2 · Pricing** | Target gross margin → **Recommended Selling Price**, mark-up, scenario table |
 | **3 · Card** | **Costing & Pricing Card** — one approval-ready page: photo, cost broken down per unit, selling price |
+| **4 · Library** | **Product Library** — every saved product in the database: search, filter, open, duplicate, delete |
 
 **Planned modules** (listed on the home page, not built): Budgeting & Forecasting · Invoicing & Receivables ·
 Purchasing & Payables · Inventory & Stock Valuation · General Ledger · Fixed Assets · Payroll ·
 Cash & Treasury · Tax & VAT Returns · Financial Reporting. They appear as a roadmap only — nothing in the UI
 links to or pretends to run a module that does not exist.
 
-Everything recalculates on every keystroke; nothing is hard-coded; every visible button works.
+Everything recalculates on every keystroke; nothing is hard-coded; every visible button works. Products are
+saved to a **SQLite database on the server**, so a costing you save is still there after a refresh, a browser
+restart or a new machine pointed at the same server.
 
 ## Adding a module
 
@@ -34,9 +37,19 @@ other change. Modules never import each other — they share only `@shared/*`.
 
 ```
 ├── index.html
-├── vite.config.ts               aliases: @shared, @shell, @modules
-├── vite.standalone.config.ts    single-file build
-├── scripts/inline-standalone.mjs
+├── vite.config.ts               aliases + /api dev proxy
+├── vite.standalone.config.ts    single-file build (no backend)
+├── scripts/
+│   ├── dev.mjs                  runs the API and Vite together
+│   └── inline-standalone.mjs
+├── data/                        the SQLite database lives here (git-ignored)
+├── server/                      ── backend ──
+│   ├── index.ts                 entry: serves /api and, in production, dist/
+│   ├── app.ts                   Express routes, JSON errors
+│   ├── db.ts                    node:sqlite connection + versioned migrations
+│   ├── products.repository.ts   every SQL statement in the system
+│   ├── validation.ts            server-side request validation
+│   └── products.repository.test.ts
 └── src/
     ├── main.tsx                 entry: router, system status, module providers
     ├── App.tsx                  routes derived from the module registry
@@ -48,7 +61,9 @@ other change. Modules never import each other — they share only `@shared/*`.
     │
     ├── shared/                  ── reusable by every module ──
     │   ├── ui/                  Card, Field, NumericInput, Modal, Notice, Summary
-    │   ├── lib/                 format.ts, id.ts, print.ts
+    │   ├── lib/                 format.ts, id.ts, print.ts, hash.ts
+    │   ├── api/client.ts        fetch wrapper, ApiError, offline detection
+    │   ├── contracts/products.ts  API types shared with the server
     │   └── state/SystemStatus.tsx  modules report issues, the shell shows them
     │
     ├── modules/
@@ -58,10 +73,11 @@ other change. Modules never import each other — they share only `@shared/*`.
     │       ├── lib/             calculations.ts (engine) + tests, validation,
     │       │                    storage, image
     │       ├── config/defaults.ts
-    │       ├── state/           store.ts (reducer), AppStateContext.tsx
+    │       ├── state/           store.ts (reducer), AppStateContext.tsx,
+    │       │                    LibraryContext.tsx (saved products + save status)
     │       ├── hooks/useFormatters.ts
-    │       ├── components/      costing/, pricing/, card/, print/, settings/
-    │       ├── pages/           CostingPage, PricingPage, CardPage
+    │       ├── components/      costing/, pricing/, card/, print/, settings/, library/
+    │       ├── pages/           CostingPage, PricingPage, CardPage, LibraryPage
     │       └── styles/module.css
     │
     └── styles/
@@ -142,6 +158,52 @@ Every division goes through `safeDivide`, so a missing or zero Quantity Produced
 
 ---
 
+## 2b. Saved products and the database
+
+**Storage.** SQLite through Node's built-in `node:sqlite` — a real SQL database in a file
+(`data/finance-support.db`), with no native module to compile and nothing to install or host. The schema is
+created and upgraded by numbered migrations in `server/db.ts`, tracked with `PRAGMA user_version`, so an
+existing database is migrated in place rather than recreated.
+
+**What a saved product holds.** The denormalised figures the library list shows (name, code, category, date,
+quantity, cost per unit, selling price, margin, currency, thumbnail) plus three JSON documents: the costing
+model, the pricing inputs, and **the settings that were in force at save time**. That last one is what makes
+a reopened product reproduce the figures it was approved with: VAT rate and treatment, currency and the
+unallocated-cost rule travel with the product, even if the workspace defaults have changed since.
+
+**The figures are never trusted from the screen.** Totals are recomputed by the calculation engine when a
+product is saved and again when it is opened; the stored numbers exist only so the library can be listed and
+sorted without loading every model. A test asserts the round trip (`lib/productsApi.test.ts`).
+
+| Endpoint | Purpose |
+| --- | --- |
+| `GET /api/health` | status and the number of saved products |
+| `GET /api/products?q=&category=&sort=` | library list (no model payload), plus the categories in use |
+| `GET /api/products/:id` | one product with its full model |
+| `POST /api/products` | save the workspace as a new product |
+| `PUT /api/products/:id` | update the linked product |
+| `POST /api/products/:id/duplicate` | copy a product, server-side, as "… (copy)" |
+| `DELETE /api/products/:id` | delete permanently |
+
+Failures return `{ error: { code, message, details } }`; the client renders `message` and any field
+`details` as they are. Search and sort are parameterised — the sort option is matched against a fixed list
+rather than interpolated — so no user input reaches SQL as text.
+
+**Saving in the app.** The header carries a Save button and a status chip that reads *Not in library*,
+*Unsaved changes*, *Saving…*, *Saved HH:MM* or *Not saved*, and the page shows the result of the last save
+with the product name or the reason it failed. Once a product is saved the workspace is linked to it, so
+Save updates that row; **Save as new** stores a separate product. If the linked product was deleted from
+another tab, Save keeps your work by writing it as a new product instead of failing.
+
+**The Product Library page** loads from the database whenever the app opens. Search covers name, code and
+category; results can be filtered by category and sorted five ways. Each product can be opened (it replaces
+the workspace, then takes you to Costing), duplicated, or deleted behind a confirmation dialog that names
+the product. Loading shows skeleton cards, an unreachable server shows the reason and a *Try again* button,
+an empty database explains how to save the first product, and filters that match nothing offer to clear
+themselves.
+
+---
+
 ## 3. Data model
 
 ```ts
@@ -163,8 +225,11 @@ PricingModel  { targetGrossMargin, scenarioMargins[] }
 AppSettings   { currency, locale, vatRate, vatableByDefault, vatTreatment,
                 unallocatedTreatment, measurements[], marketingTypes[] }
 
-AppState      { costing, pricing, settings }     // persisted under
-                                                // finance-support:costing-pricing:v1
+AppState      { costing, pricing, settings,
+                savedProductId, savedAt, savedHash }  // the open product + change detection
+
+// The draft workspace is mirrored to localStorage (finance-support:costing-pricing:v1)
+// so a refresh never loses work in progress; saved products live in SQLite.
 ```
 
 Calculated totals are **never stored** — they are derived from the model by the engine
@@ -177,18 +242,37 @@ The model is plain JSON: ready for a database, versioning, or an export endpoint
 
 ```bash
 npm install
-npm run dev              # http://localhost:5173
-npm test                 # calculation engine + specification test case
-npm run build            # type-check + production build into dist/
-npm run preview          # serve the production build
-npm run build:standalone # one self-contained .html file (see below)
-npm run lint
+npm start                # build + run everything on http://localhost:4000
 ```
 
+That one command serves the app and the API from the same port, with the database in `data/`. For
+development with hot reload:
+
+```bash
+npm run dev              # API on :4000 + Vite on http://localhost:5173 (proxies /api)
+npm run dev:api          # the API alone
+npm run dev:web          # the front end alone
+```
+
+Other scripts:
+
+```bash
+npm test                 # engine, saved-product round trip, repository and HTTP API
+npm run build            # type-check + production build into dist/
+npm run serve            # run the API (and dist/, if built) without rebuilding
+npm run build:standalone # one self-contained .html file (no backend — see below)
+npm run lint
+npm run typecheck
+```
+
+`PORT` and `DATABASE_PATH` override the defaults (`4000` and `data/finance-support.db`).
+
 **No-install option.** `npm run build:standalone` writes
-`dist-standalone/finance-support.html` — the entire app (markup, styles, bundle) in a single file that
-runs by double-clicking it: no server, no install, no network. Handy for sharing the tool with someone who
-does not develop, or for keeping a frozen copy of a costing session.
+`dist-standalone/finance-support.html` — the entire front end in a single file that runs by double-clicking
+it: no server, no install, no network. It has no database, so the Product Library says so and the Save
+button is hidden; the costing, pricing and card pages work exactly as they do in the full app, with the
+current model kept in the browser. Use it to share the calculator; use `npm start` to build a product
+library.
 
 The app version is shown in the header (e.g. `v1.1.0 · Total cost per unit · …`), so you can always tell
 which build you are looking at.
@@ -266,7 +350,7 @@ production expense `Yes` = spread over 1,000 units, net costing):
 The specification's own illustration is also asserted in the tests: base 160 → +15% → **184.00**, and
 184 ÷ (1 − 40%) → **306.67** with a 122.67 gross profit and a 66.67% mark-up.
 
-`npm test` → **25 passing tests**.
+`npm test` → **48 passing tests** (engine, saved-product round trip, repository, HTTP API).
 
 ---
 
@@ -293,15 +377,20 @@ The specification's own illustration is also asserted in the tests: base 160 →
 8. **The product photo lives inside the model** as a compressed data URL (typically well under 300 KB), so it
    survives a reload and travels with an export. If the browser refuses to store the model, the app says so
    rather than losing the work silently.
-9. **Persistence** is the browser's localStorage, namespaced per module
-   (`finance-support:costing-pricing:v1`, migrated from the pre-platform key) — one active model per browser,
-   no backend yet.
-10. **Currency** is a formatting label (default EGP); the app does not convert between currencies.
+9. **Two levels of persistence.** Saved products live in the server's SQLite database and are the system of
+   record. The workspace you are editing is also mirrored to localStorage, so a refresh mid-costing loses
+   nothing even before you press Save. Clearing site data only discards the unsaved draft.
+10. **No authentication yet**, so every product in the database is visible to anyone who can reach the
+   server. The repository and API are already shaped to take an owner column when accounts arrive.
+11. **Currency** is a formatting label (default EGP); the app does not convert between currencies.
 
 ---
 
 ## 7. Future improvements
 
+- Accounts and per-user libraries, then sharing and approval of a saved costing.
+- Costing versions: keep the history of a product instead of overwriting it, and compare two versions.
+- Server-side export (PDF/Excel) of any saved product, and bulk export of the library.
 - The planned modules above, starting with the one the business needs next.
 - A shared company/entity record (name, logo, currency, fiscal year) used by every module and its documents.
 - Cross-module links once a second module exists — a costing feeding a budget line, an invoice priced from a

@@ -146,4 +146,14 @@ export interface AppState {
   costing: CostingModel;
   pricing: PricingModel;
   settings: AppSettings;
+  /**
+   * The saved product this workspace is currently linked to, if any.
+   * Set when a product is saved or opened from the Product Library; Save then
+   * updates that record instead of creating another one.
+   */
+  savedProductId: string | null;
+  /** When the linked product was last written to the database (ISO). */
+  savedAt: string | null;
+  /** Hash of the model as it was saved, so unsaved changes can be detected. */
+  savedHash: string | null;
 }

@@ -24,3 +24,6 @@ dist-ssr
 *.sw?
 
 dist-standalone
+
+# local database
+data/

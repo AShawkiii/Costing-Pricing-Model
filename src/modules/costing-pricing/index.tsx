@@ -6,7 +6,7 @@
  * documents it can print. The shell knows nothing else about it.
  */
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 
 import { Modal } from '@shared/ui/Modal';
 import { Notice } from '@shared/ui/Notice';
@@ -16,15 +16,32 @@ import type { AvailableModule } from '@shell/modules';
 import { CostingPricingCard } from './components/card/CostingPricingCard';
 import { CostSheet } from './components/print/CostSheet';
 import { SettingsDialog } from './components/settings/SettingsDialog';
+import { SaveControls } from './components/library/SaveControls';
 import { CardPage } from './pages/CardPage';
+import { LibraryPage } from './pages/LibraryPage';
 import { CostingPage } from './pages/CostingPage';
 import { PricingPage } from './pages/PricingPage';
 import { AppStateProvider, useApp } from './state/AppStateContext';
+import { LibraryProvider, useLibrary } from './state/LibraryContext';
 import { useFormatters } from './hooks/useFormatters';
 
 import './styles/module.css';
 
-export const COSTING_PRICING_BASE = '/costing-pricing';
+export { COSTING_PRICING_BASE } from './routes';
+
+import { COSTING_PRICING_BASE as BASE_PATH } from './routes';
+
+/**
+ * The module's state: the workspace model, and the library of products saved
+ * in the database on top of it.
+ */
+function CostingPricingProvider({ children }: { children: ReactNode }) {
+  return (
+    <AppStateProvider>
+      <LibraryProvider>{children}</LibraryProvider>
+    </AppStateProvider>
+  );
+}
 
 /** Header buttons shown while this module is open. */
 function CostingPricingActions() {
@@ -34,6 +51,7 @@ function CostingPricingActions() {
 
   return (
     <>
+      <SaveControls />
       <button className="btn btn--ghost-light btn--sm" onClick={() => setSettingsOpen(true)}>
         Settings
       </button>
@@ -92,6 +110,7 @@ function CostingPricingPrintDocuments() {
 /** Live figures on the module's tile on the Finance Support home page. */
 function CostingPricingHomeSummary() {
   const { state, costing, pricing } = useApp();
+  const { total, status, apiEnabled } = useLibrary();
   const f = useFormatters();
   const { product } = state.costing;
 
@@ -109,6 +128,10 @@ function CostingPricingHomeSummary() {
         <dt>Selling price at {f.pct(pricing.targetGrossMargin)}</dt>
         <dd>{f.money(pricing.sellingPrice)}</dd>
       </div>
+      <div>
+        <dt>Saved products</dt>
+        <dd>{!apiEnabled ? '—' : status === 'ready' ? f.int(total) : '…'}</dd>
+      </div>
     </dl>
   );
 }
@@ -120,14 +143,15 @@ export const costingPricingModule: AvailableModule = {
     'True cost per unit for a production run — materials, samples, marketing, overheads and exchange-rate valuation — and the selling price required to hit a target gross profit margin.',
   group: 'Costing & Pricing',
   status: 'available',
-  basePath: COSTING_PRICING_BASE,
+  basePath: BASE_PATH,
   mark: '₤',
   pages: [
     { path: 'costing', label: 'Costing', element: <CostingPage /> },
     { path: 'pricing', label: 'Pricing', element: <PricingPage /> },
     { path: 'card', label: 'Card', element: <CardPage /> },
+    { path: 'library', label: 'Library', element: <LibraryPage /> },
   ],
-  Provider: AppStateProvider,
+  Provider: CostingPricingProvider,
   Actions: CostingPricingActions,
   PrintDocuments: CostingPricingPrintDocuments,
   HomeSummary: CostingPricingHomeSummary,

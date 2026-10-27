@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-const ICONS = { error: '!', warn: '!', info: 'i', accent: '=' } as const;
+const ICONS = { error: '!', warn: '!', info: 'i', accent: '\u2022' } as const;
 
 export function Notice({
   tone = 'info',

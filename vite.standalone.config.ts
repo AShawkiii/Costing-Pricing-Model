@@ -14,6 +14,11 @@ import baseConfig from './vite.config';
 export default mergeConfig(
   baseConfig,
   defineConfig({
+    // No server in a file:// build, so the Product Library explains itself
+    // instead of failing to reach an API that was never there.
+    define: {
+      __API_ENABLED__: 'false',
+    },
     build: {
       outDir: 'dist-standalone',
       cssCodeSplit: false,

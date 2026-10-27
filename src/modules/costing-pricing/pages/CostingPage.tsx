@@ -10,6 +10,7 @@ import { CostLineTable } from '../components/costing/CostLineTable';
 import { MarketingTable } from '../components/costing/MarketingTable';
 import { IndirectCostCard } from '../components/costing/IndirectCostCard';
 import { CostSummaryCard } from '../components/costing/CostSummaryCard';
+import { SaveResultNotice } from '../components/library/SaveControls';
 import { ValidationPanel } from '../components/ValidationPanel';
 import { Notice } from '@shared/ui/Notice';
 import { useApp } from '../state/AppStateContext';
@@ -22,6 +23,8 @@ export function CostingPage() {
   return (
     <div className="page-layout">
       <div className="page-column">
+        <SaveResultNotice />
+
         <ValidationPanel issues={costingIssues} />
 
         <ProductInfoCard />

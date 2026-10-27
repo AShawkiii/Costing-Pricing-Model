@@ -112,5 +112,8 @@ export function createInitialState(): AppState {
     costing: createCostingModel(),
     pricing: createPricingModel(),
     settings: DEFAULT_SETTINGS,
+    savedProductId: null,
+    savedAt: null,
+    savedHash: null,
   };
 }
